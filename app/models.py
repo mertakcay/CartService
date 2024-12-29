@@ -1,9 +1,10 @@
+import os
 from sqlalchemy import create_engine, Column, Integer, String, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from tenacity import retry, wait_fixed, stop_after_attempt
 
-DATABASE_URL = "postgresql://postgres:password@db/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 @retry(wait=wait_fixed(2), stop=stop_after_attempt(10))
 def get_engine():

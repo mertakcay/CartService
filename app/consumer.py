@@ -1,3 +1,4 @@
+import os
 import pika
 import json
 from sqlalchemy.orm import Session
@@ -31,7 +32,8 @@ def callback(ch, method, properties, body):
             cart.product_ids.remove(product_id)
             db.commit()
 
-connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+rabbitmq_url = os.getenv("RABBITMQ_URL")
+connection = pika.BlockingConnection(pika.URLParameters(rabbitmq_url))
 channel = connection.channel()
 channel.queue_declare(queue='cart_queue')
 channel.basic_consume(queue='cart_queue', on_message_callback=callback, auto_ack=True)
