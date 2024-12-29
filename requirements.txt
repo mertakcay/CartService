@@ -4,3 +4,5 @@ sqlalchemy
 asyncpg
 databases
 pika
+psycopg2
+tenacity
