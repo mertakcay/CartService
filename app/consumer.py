@@ -54,6 +54,21 @@ class CartConsumer:
         else:
             logger.warning(f"Cart not found or product {product_id} not in cart for user {user_id}")
 
+    def process_delete_cart(self, db: Session, user_id: int):
+        logger.info(f"Processing delete cart request for user: {user_id}")
+        try:
+            cart = db.query(CartDB).filter(CartDB.user_id == user_id).first()
+            if cart:
+                db.delete(cart)
+                db.commit()
+                logger.info(f"Successfully deleted cart for user: {user_id}")
+            else:
+                logger.warning(f"Cart not found for user: {user_id}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting cart for user {user_id}: {str(e)}")
+            raise
+
     def callback(self, ch, method, properties, body):
         try:
             message = json.loads(body)
@@ -62,15 +77,23 @@ class CartConsumer:
             product_id = message.get("product_id")
             amount = message.get("amount")
 
-            if not all([action, user_id, product_id, amount]):
+            if not action or not user_id:
                 logger.error(f"Invalid message format: {message}")
                 return
 
             with get_db() as db:
                 if action == "add":
+                    if not all([product_id, amount]):
+                        logger.error("Missing product_id or amount for add action")
+                        return
                     self.process_add_product(db, user_id, product_id, amount)
                 elif action == "remove":
+                    if not all([product_id, amount]):
+                        logger.error("Missing product_id or amount for remove action")
+                        return
                     self.process_remove_product(db, user_id, product_id, amount)
+                elif action == "delete_cart":
+                    self.process_delete_cart(db, user_id)
                 else:
                     logger.error(f"Unknown action: {action}")
 

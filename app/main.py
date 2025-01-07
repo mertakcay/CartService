@@ -114,3 +114,20 @@ def remove_product_from_cart(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process request: {str(e)}"
         )
+
+@app.delete("/cart/{user_id}", status_code=status.HTTP_202_ACCEPTED)
+def delete_cart(user_id: int, db: Session = Depends(get_db)):
+    try:
+        message = {
+            "action": "delete_cart",
+            "user_id": user_id,
+            "product_id": None,
+            "amount": None
+        }
+        rabbitmq_client.publish_message(message)
+        return {"message": f"Cart deletion request for user {user_id} sent successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process request: {str(e)}"
+        )

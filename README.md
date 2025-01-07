@@ -110,6 +110,18 @@ python -m app.consumer
 }
 ```
 
+### DELETE /cart/{user_id}
+- Delete entire cart for a specific user
+- Response: 
+```json
+{
+    "message": "Cart deletion request for user {user_id} sent successfully"
+}
+```
+- Status Codes:
+  - 202: Accepted (deletion request processed)
+  - 500: Internal Server Error
+
 ## Error Handling
 
 The service includes comprehensive error handling:
@@ -152,6 +164,15 @@ cartservice-consumer-1  | INFO:__main__:Decreased amount - Product: 3, Old: 4, N
 cartservice-consumer-1  | INFO:__main__:Updated cart state - Products: [2, 3], Amounts: [3, 2]
 cartservice-consumer-1  | INFO:__main__:Successfully committed changes - User: 1, Final cart state: {'_sa_instance_state': <sqlalchemy.orm.state.InstanceState object at 0xfffface28970>}
 cartservice-api-1       | INFO:     192.168.240.1:60586 - "GET /cart/1 HTTP/1.1" 200 OK
+}
+```
+
+#### Delete Cart
+```json
+{
+cartservice-consumer-1  | INFO:__main__:Processing delete cart request for user: 1
+cartservice-consumer-1  | INFO:__main__:Successfully deleted cart for user: 1
+cartservice-api-1       | INFO:     192.168.240.1:65080 - "DELETE /cart/1 HTTP/1.1" 202 Accepted
 }
 ```
 
