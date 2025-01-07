@@ -1,30 +1,42 @@
 version: '3.8'
 
 services:
-  cart-service:
+  api:
     build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - RABBITMQ_URL=${RABBITMQ_URL}
+      - DATABASE_URL=postgresql://postgres:password@db/postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+      - rabbitmq
+
+  consumer:
+    build: .
+    command: python -m app.consumer
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db/postgres
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - db
+      - rabbitmq
 
   db:
     image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -32,5 +44,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+volumes:
+  postgres_data:
