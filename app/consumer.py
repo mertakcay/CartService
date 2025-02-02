@@ -26,33 +26,88 @@ class CartConsumer:
         self.rabbitmq_url = os.getenv("RABBITMQ_URL")
         
     def process_add_product(self, db: Session, user_id: int, product_id: int, amount: int):
+        # Get or create cart for user
         cart = db.query(CartDB).filter(CartDB.user_id == user_id).first()
+        logger.info(f"Processing add product - User: {user_id}, Product: {product_id}, Amount: {amount}")
+        
         if not cart:
-            cart = CartDB(user_id=user_id, product_ids=[product_id], amounts=[amount])
+            # Create new cart if it doesn't exist
+            cart = CartDB(
+                user_id=user_id,
+                product_ids=[product_id],
+                amounts=[amount]
+            )
             db.add(cart)
+            logger.info(f"Created new cart for user {user_id} with product {product_id}")
         else:
-            if product_id in cart.product_ids:
-                index = cart.product_ids.index(product_id)
-                cart.amounts[index] += amount
-            else:
-                cart.product_ids.append(product_id)
-                cart.amounts.append(amount)
-        db.commit()
-        logger.info(f"Added product {product_id} with amount {amount} to cart for user {user_id}")
+            # Ensure arrays are initialized and are lists
+            cart.product_ids = list(cart.product_ids or [])
+            cart.amounts = list(cart.amounts or [])
+            
+            try:
+                if product_id in cart.product_ids:
+                    # Update existing product amount
+                    index = cart.product_ids.index(product_id)
+                    cart.amounts[index] += amount
+                    logger.info(f"Updated amount for product {product_id} in cart for user {user_id}")
+                else:
+                    # Add new product to cart
+                    cart.product_ids.append(product_id)
+                    cart.amounts.append(amount)
+                    logger.info(f"Added new product {product_id} to cart for user {user_id}")
+            except Exception as e:
+                logger.error(f"Error updating cart: {str(e)}")
+                raise
+
+        try:
+            db.commit()
+            logger.info(f"Successfully saved cart changes - User: {user_id}, Products: {cart.product_ids}, Amounts: {cart.amounts}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to commit changes: {str(e)}")
+            raise
 
     def process_remove_product(self, db: Session, user_id: int, product_id: int, amount: int):
         cart = db.query(CartDB).filter(CartDB.user_id == user_id).first()
-        if cart and product_id in cart.product_ids:
+        logger.info(f"Processing remove product - User: {user_id}, Product: {product_id}, Amount: {amount}")
+
+        if not cart:
+            logger.warning(f"Cart not found for user {user_id}")
+            return
+            
+        if not cart.product_ids or product_id not in cart.product_ids:
+            logger.warning(f"Product {product_id} not found in cart for user {user_id}")
+            return
+
+        try:
+            # Ensure we're working with lists
+            cart.product_ids = list(cart.product_ids or [])
+            cart.amounts = list(cart.amounts or [])
+            
             index = cart.product_ids.index(product_id)
-            if cart.amounts[index] <= amount:
+            current_amount = cart.amounts[index]
+            
+            if amount >= current_amount:
+                # Remove the product completely
                 cart.product_ids.pop(index)
                 cart.amounts.pop(index)
+                logger.info(f"Removed product {product_id} completely from cart for user {user_id}")
             else:
-                cart.amounts[index] -= amount
-            db.commit()
-            logger.info(f"Removed product {product_id} with amount {amount} from cart for user {user_id}")
-        else:
-            logger.warning(f"Cart not found or product {product_id} not in cart for user {user_id}")
+                # Decrease the amount
+                cart.amounts[index] = current_amount - amount
+                logger.info(f"Decreased amount of product {product_id} by {amount} for user {user_id}")
+
+            try:
+                db.commit()
+                logger.info(f"Successfully saved cart changes - User: {user_id}, Products: {cart.product_ids}, Amounts: {cart.amounts}")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to commit changes: {str(e)}")
+                raise
+
+        except Exception as e:
+            logger.error(f"Error updating cart: {str(e)}")
+            raise
 
     def process_delete_cart(self, db: Session, user_id: int):
         logger.info(f"Processing delete cart request for user: {user_id}")
